@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:imc_app/classes/imc.dart';
+// import 'package:imc_app/classes/imc.dart';
+import 'package:imc_app/models/imc_model.dart';
 import 'package:imc_app/repositories/imc_repo.dart';
 
 class CreateIMCPage extends StatefulWidget {
@@ -10,11 +11,12 @@ class CreateIMCPage extends StatefulWidget {
 }
 
 class _CreateIMCPageState extends State<CreateIMCPage> {
+  var imcNameController = TextEditingController(text: "");
   var imcHeightController = TextEditingController(text: "");
   var imcWeightController = TextEditingController(text: "");
-  var imcRepo = IMCRepository();
+  late IMCRepository imcRepo;
   // ignore: non_constant_identifier_names
-  var _IMCs = <IMC>[];
+  var _IMCs = <IMCModel>[];
 
   Widget imcCreationDialog(BuildContext bc) {
     return AlertDialog(
@@ -22,10 +24,17 @@ class _CreateIMCPageState extends State<CreateIMCPage> {
       content: Column(
         children: [
           TextField(
+            keyboardType: TextInputType.name,
+            controller: imcNameController,
+            decoration: const InputDecoration(labelText: "Name"),
+          ),
+          TextField(
+            keyboardType: TextInputType.number,
             controller: imcWeightController,
             decoration: const InputDecoration(labelText: "Weight"),
           ),
           TextField(
+            keyboardType: TextInputType.number,
             controller: imcHeightController,
             decoration: const InputDecoration(labelText: "Height"),
           )
@@ -45,12 +54,12 @@ class _CreateIMCPageState extends State<CreateIMCPage> {
   }
 
   void onCalculateNewImc() {
+    var name = imcNameController.text;
     var parsedHeight = double.tryParse(imcHeightController.text);
-    print(parsedHeight);
     var parsedWeight = double.tryParse(imcWeightController.text);
-    print(parsedWeight);
+
     if (parsedHeight != null && parsedWeight != null) {
-      var imc = IMC(parsedHeight, parsedWeight);
+      var imc = IMCModel.create(name, parsedHeight, parsedWeight);
       imc.calculateIMC();
       imcRepo.saveNew(imc);
       cleanControllers();
@@ -69,18 +78,25 @@ class _CreateIMCPageState extends State<CreateIMCPage> {
   }
 
   void cleanControllers() {
+    imcNameController.text = "";
     imcHeightController.text = "";
     imcWeightController.text = "";
   }
 
   void retrieveIMCs() {
     _IMCs = imcRepo.listAll();
+    setState(() {});
   }
 
   @override
   void initState() {
     super.initState();
-    _IMCs = imcRepo.listAll();
+    loadData();
+  }
+
+  void loadData() async {
+    imcRepo = await IMCRepository.carregar();
+    retrieveIMCs();
   }
 
   @override
@@ -107,21 +123,29 @@ class _CreateIMCPageState extends State<CreateIMCPage> {
                   itemBuilder: (BuildContext bc, int index) {
                     var imc = _IMCs[index];
                     return Dismissible(
-                      key: Key(imc.id),
+                      key: Key(imc.key.toString()),
                       child: ListTile(
                           title:
                               Text("IMC value: ${imc.imc.toStringAsFixed(2)}"),
-                          subtitle:
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text("Classification: ${imc.classification}"),
+                              Text("Name: ${imc.name}")
+                            ],
+                          ),
                           trailing: InkWell(
                             child: const Icon(Icons.close_rounded),
                             onTap: () {
                               imcRepo.delete(imc);
+                              retrieveIMCs();
                               setState(() {});
                             },
                           )),
                       onDismissed: (DismissDirection dismissDirection) async {
                         imcRepo.delete(imc);
+                        retrieveIMCs();
+                        setState(() {});
                       },
                     );
                   },
